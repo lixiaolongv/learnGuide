@@ -7,7 +7,7 @@
 
 ## __init__的作用：
 * 1 如果放在包目录下，那么它将告诉python解释器，该目录是python包
-* 2 如果放在包目录下，同时也为python提送搜索路径
+* 2 如果放在包目录下，同时也为python提供搜索路径
 
 ## pytest.ini的作用：
 * 1 pytest.ini是可选的
