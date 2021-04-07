@@ -229,5 +229,379 @@ TEARDOWN S sess_scope
 解析：
 * 1 fixture只能使用同级别的fixture，或者比自己级别更高的fixture！
 * 2 函数级别的fixture可以使用同级别的fixture，也可以使用类级别，模块级别，会话级别的fixture，但是不能返过来！
+* 3 对于经常需要使用的全局变量，可以设置fixture为会话级别，每次会话只需要调用一次即可！
+
+## 修改fixture的作用范围
+```python
+@pytest.fixture(scope='session')
+def tasks_db_session(tmpdir_factory):
+    """Connect to db before tests, disconnect after."""
+    temp_dir = tmpdir_factory.mktemp('temp')
+    tasks.start_tasks_db(str(temp_dir), 'tiny')
+    yield
+    tasks.stop_tasks_db()
+
+
+@pytest.fixture()
+def tasks_db(tasks_db_session):
+    """An empty tasks db."""
+    tasks.delete_all()
+```
+解析：  
+每次测试都需要配置一个临时目录，新建一次数据库连接，这样显得有些浪费，实际上，只要保证每次测试时数据库连接一次即可，
+所以把数据库的连接调整至会话级别即可，所以选择会话级别的临时工厂tmpdir_factory
+
+## 使用usefixtures指定fixture
+```python
+@pytest.mark.usefixtures('class_scope')
+class TestSomething():
+    """Demo class scope fixtures."""
+
+    def test_3(self):
+        """Test using a class scope fixture."""
+
+    def test_4(self):
+        """Again, multiple tests are more fun."""
+```
+解析：  
+使用@pytest.mark.usefixtures('fixture1', 'fixrure2')标记测试函数或类，与在测试函数中添加fixture的区别是
+只有后者才能使用fixture的返回值
+
+## 为常用的fixture添加autouse选项
+```python
+@pytest.fixture(autouse=True, scope='session')
+def footer_session_scope():
+    """Report the time at the end of a session."""
+    yield
+    now = time.time()
+    print('--')
+    print('finished : {}'.format(time.strftime('%d %b %X', time.localtime(now))))
+    print('-----------------')
+
+
+@pytest.fixture(autouse=True)
+def footer_function_scope():
+    """Report test durations after each function."""
+    start = time.time()
+    yield
+    stop = time.time()
+    delta = stop - start
+    print('\ntest duration : {:0.3} seconds'.format(delta))
+
+
+def test_1():
+    """Simulate long-ish running test."""
+    time.sleep(1)
+
+
+def test_2():
+    """Simulate slightly longer test."""
+    time.sleep(1.23)
+```
+
+测试结果如下：
+```python
+collected 2 items                                                                                                                                                                                   
+
+test_autouse.py::test_1 PASSED
+test duration : 1.0 seconds
+
+test_autouse.py::test_2 PASSED
+test duration : 1.23 seconds
+--
+finished : 07 Apr 22:39:52
+-----------------
+```
+解析：  
+* 1 指定autouse=true选项，使作用域内的测试函数都运行该fixture
+
+## 为fixture重命名
+```python
+@pytest.fixture(name='lue')
+def ultimate_answer_to_life_the_universe_and_everything():
+    """Return ultimate answer."""
+    return 42
+
+
+def test_everything(lue):
+    """Use the shorter name."""
+    assert lue == 42
+```
+
+测试结果如下：
+```python
+(homedotest)  mac@192  ~/Downloads/code/ch3  pytest --setup-show test_rename_fixture.py 
+======================================================================================== test session starts ========================================================================================
+platform darwin -- Python 3.8.2, pytest-6.2.2, py-1.10.0, pluggy-0.13.1
+rootdir: /Users/mac/Downloads/code/ch3
+plugins: rerunfailures-9.1.1, html-3.1.1, xdist-2.2.1, metadata-1.11.0, ordering-0.6, allure-pytest-2.8.36, forked-1.3.0
+collected 1 item                                                                                                                                                                                    
+
+test_rename_fixture.py 
+        SETUP    F lue
+        test_rename_fixture.py::test_everything (fixtures used: lue).
+        TEARDOWN F lue
+
+========================================================================================= 1 passed in 0.02s ==============
+```
+解析：重命名之后，fixture就是lue
+
+查看所有fixture的列表
+```python
+(homedotest)  ✘ mac@192  ~/Downloads/code/ch3/b/tasks_proj  pytest --fixtures tests/func/test_add.py 
+======================================================================================== test session starts ========================================================================================
+platform darwin -- Python 3.8.2, pytest-6.2.2, py-1.10.0, pluggy-0.13.1
+rootdir: /Users/mac/Downloads/code/ch3/b/tasks_proj/tests, configfile: pytest.ini
+plugins: rerunfailures-9.1.1, html-3.1.1, xdist-2.2.1, metadata-1.11.0, ordering-0.6, allure-pytest-2.8.36, forked-1.3.0
+collected 3 items                                                                                                                                                                                   
+cache
+    Return a cache object that can persist state between testing sessions.
+    
+    cache.get(key, default)
+    cache.set(key, value)
+    
+    Keys must be ``/`` separated strings, where the first part is usually the
+    name of your plugin or application to avoid clashes with other cache users.
+    
+    Values can be any object handled by the json stdlib module.
+
+capsys
+    Enable text capturing of writes to ``sys.stdout`` and ``sys.stderr``.
+    
+    The captured output is made available via ``capsys.readouterr()`` method
+    calls, which return a ``(out, err)`` namedtuple.
+    ``out`` and ``err`` will be ``text`` objects.
+
+capsysbinary
+    Enable bytes capturing of writes to ``sys.stdout`` and ``sys.stderr``.
+    
+    The captured output is made available via ``capsysbinary.readouterr()``
+    method calls, which return a ``(out, err)`` namedtuple.
+    ``out`` and ``err`` will be ``bytes`` objects.
+
+capfd
+    Enable text capturing of writes to file descriptors ``1`` and ``2``.
+    
+    The captured output is made available via ``capfd.readouterr()`` method
+    calls, which return a ``(out, err)`` namedtuple.
+    ``out`` and ``err`` will be ``text`` objects.
+
+capfdbinary
+    Enable bytes capturing of writes to file descriptors ``1`` and ``2``.
+    
+    The captured output is made available via ``capfd.readouterr()`` method
+    calls, which return a ``(out, err)`` namedtuple.
+    ``out`` and ``err`` will be ``byte`` objects.
+
+doctest_namespace [session scope]
+    Fixture that returns a :py:class:`dict` that will be injected into the
+    namespace of doctests.
+
+pytestconfig [session scope]
+    Session-scoped fixture that returns the :class:`_pytest.config.Config` object.
+    
+    Example::
+    
+        def test_foo(pytestconfig):
+            if pytestconfig.getoption("verbose") > 0:
+                ...
+
+record_property
+    Add extra properties to the calling test.
+    
+    User properties become part of the test report and are available to the
+    configured reporters, like JUnit XML.
+    
+    The fixture is callable with ``name, value``. The value is automatically
+    XML-encoded.
+    
+    Example::
+    
+        def test_function(record_property):
+            record_property("example_key", 1)
+
+record_xml_attribute
+    Add extra xml attributes to the tag for the calling test.
+    
+    The fixture is callable with ``name, value``. The value is
+    automatically XML-encoded.
+
+record_testsuite_property [session scope]
+    Record a new ``<property>`` tag as child of the root ``<testsuite>``.
+    
+    This is suitable to writing global information regarding the entire test
+    suite, and is compatible with ``xunit2`` JUnit family.
+    
+    This is a ``session``-scoped fixture which is called with ``(name, value)``. Example:
+    
+    .. code-block:: python
+    
+        def test_foo(record_testsuite_property):
+            record_testsuite_property("ARCH", "PPC")
+            record_testsuite_property("STORAGE_TYPE", "CEPH")
+    
+    ``name`` must be a string, ``value`` will be converted to a string and properly xml-escaped.
+    
+    .. warning::
+    
+        Currently this fixture **does not work** with the
+        `pytest-xdist <https://github.com/pytest-dev/pytest-xdist>`__ plugin. See issue
+        `#7767 <https://github.com/pytest-dev/pytest/issues/7767>`__ for details.
+
+caplog
+    Access and control log capturing.
+    
+    Captured logs are available through the following properties/methods::
+    
+    * caplog.messages        -> list of format-interpolated log messages
+    * caplog.text            -> string containing formatted log output
+    * caplog.records         -> list of logging.LogRecord instances
+    * caplog.record_tuples   -> list of (logger_name, level, message) tuples
+    * caplog.clear()         -> clear captured records and formatted log output string
+
+monkeypatch
+    A convenient fixture for monkey-patching.
+    
+    The fixture provides these methods to modify objects, dictionaries or
+    os.environ::
+    
+        monkeypatch.setattr(obj, name, value, raising=True)
+        monkeypatch.delattr(obj, name, raising=True)
+        monkeypatch.setitem(mapping, name, value)
+        monkeypatch.delitem(obj, name, raising=True)
+        monkeypatch.setenv(name, value, prepend=False)
+        monkeypatch.delenv(name, raising=True)
+        monkeypatch.syspath_prepend(path)
+        monkeypatch.chdir(path)
+    
+    All modifications will be undone after the requesting test function or
+    fixture has finished. The ``raising`` parameter determines if a KeyError
+    or AttributeError will be raised if the set/deletion operation has no target.
+
+recwarn
+    Return a :class:`WarningsRecorder` instance that records all warnings emitted by test functions.
+    
+    See http://docs.python.org/library/warnings.html for information
+    on warning categories.
+
+tmpdir_factory [session scope]
+    Return a :class:`_pytest.tmpdir.TempdirFactory` instance for the test session.
+
+tmp_path_factory [session scope]
+    Return a :class:`_pytest.tmpdir.TempPathFactory` instance for the test session.
+
+tmpdir
+    Return a temporary directory path object which is unique to each test
+    function invocation, created as a sub directory of the base temporary
+    directory.
+    
+    By default, a new base temporary directory is created each test session,
+    and old bases are removed after 3 sessions, to aid in debugging. If
+    ``--basetemp`` is used then it is cleared each session. See :ref:`base
+    temporary directory`.
+    
+    The returned object is a `py.path.local`_ path object.
+    
+    .. _`py.path.local`: https://py.readthedocs.io/en/latest/path.html
+
+tmp_path
+    Return a temporary directory path object which is unique to each test
+    function invocation, created as a sub directory of the base temporary
+    directory.
+    
+    By default, a new base temporary directory is created each test session,
+    and old bases are removed after 3 sessions, to aid in debugging. If
+    ``--basetemp`` is used then it is cleared each session. See :ref:`base
+    temporary directory`.
+    
+    The returned object is a :class:`pathlib.Path` object.
+
+
+---------------------------------------------------------------------------------- fixtures defined from conftest -----------------------------------------------------------------------------------
+tasks_db
+    An empty tasks db.
+
+tasks_just_a_few [session scope]
+    All summaries and owners are unique.
+
+tasks_mult_per_owner [session scope]
+    Several owners with several tasks each.
+
+db_with_3_tasks
+    Connected db with 3 tasks, all unique.
+
+db_with_multi_per_owner
+    Connected db with 9 tasks, 3 owners, all with 3 tasks.
+
+tasks_db_session [session scope]
+    Connect to db before tests, disconnect after.
+
+
+----------------------------------------------------------------------------- fixtures defined from pytest_html.plugin ------------------------------------------------------------------------------
+extra
+    Add details to the HTML reports.
+    
+    .. code-block:: python
+    
+        import pytest_html
+    
+    
+        def test_foo(extra):
+            extra.append(pytest_html.extras.url("http://www.example.com/"))
+
+
+--------------------------------------------------------------------------- fixtures defined from pytest_metadata.plugin ----------------------------------------------------------------------------
+metadata [session scope]
+    Provide test session metadata
+
+include_metadata_in_junit_xml [session scope]
+    Provide test session metadata
+
+
+-------------------------------------------------------------------------------- fixtures defined from xdist.plugin ---------------------------------------------------------------------------------
+worker_id [session scope]
+    Return the id of the current worker ('gw0', 'gw1', etc) or 'master'
+    if running on the master node.
+
+testrun_uid [session scope]
+    Return the unique id of the current test.
+
+
+======================================================================================= no tests ran in 0.08s =====
+```
+
+## fixture的参数化
+```python
+tasks_to_try = (Task('sleep', done=True),
+                Task('wake', 'brian'),
+                Task('breathe', 'BRIAN', True),
+                Task('exercise', 'BrIaN', False))
+
+task_ids = ['Task({},{},{})'.format(t.summary, t.owner, t.done)
+            for t in tasks_to_try]
+
+
+def equivalent(t1, t2):
+    """Check two tasks for equivalence."""
+    return ((t1.summary == t2.summary) and
+            (t1.owner == t2.owner) and
+            (t1.done == t2.done))
+
+
+@pytest.fixture(params=tasks_to_try)
+def a_task(request):
+    """Using no ids."""
+    return request.param
+
+
+def test_add_a(tasks_db, a_task):
+    """Using a_task fixture (no ids)."""
+    task_id = tasks.add(a_task)
+    t_from_db = tasks.get(task_id)
+    assert equivalent(t_from_db, a_task)
+```
+
+## 参数化fixture
+
 
 
