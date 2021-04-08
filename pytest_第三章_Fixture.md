@@ -572,6 +572,19 @@ testrun_uid [session scope]
 
 ## fixture的参数化
 ```python
+@pytest.fixture(scope='session')
+def tasks_db_session(tmpdir_factory, request):
+    """Connect to db before tests, disconnect after."""
+    temp_dir = tmpdir_factory.mktemp('temp')
+    tasks.start_tasks_db(str(temp_dir), 'tiny')
+    yield  # this is where the testing happens
+    tasks.stop_tasks_db()
+
+@pytest.fixture()
+def tasks_db(tasks_db_session):
+    """An empty tasks db."""
+    tasks.delete_all()
+
 tasks_to_try = (Task('sleep', done=True),
                 Task('wake', 'brian'),
                 Task('breathe', 'BRIAN', True),
@@ -599,9 +612,100 @@ def test_add_a(tasks_db, a_task):
     task_id = tasks.add(a_task)
     t_from_db = tasks.get(task_id)
     assert equivalent(t_from_db, a_task)
+
+
+@pytest.fixture(params=tasks_to_try, ids=task_ids)
+def b_task(request):
+    """Using a list of ids."""
+    return request.param
+
+
+def test_add_b(tasks_db, b_task):
+    """Using b_task fixture, with ids."""
+    task_id = tasks.add(b_task)
+    t_from_db = tasks.get(task_id)
+    assert equivalent(t_from_db, b_task)
+
+
+def id_func(fixture_value):
+    """A function for generating ids."""
+    t = fixture_value
+    return 'Task({},{},{})'.format(t.summary, t.owner, t.done)
+
+
+@pytest.fixture(params=tasks_to_try, ids=id_func)
+def c_task(request):
+    """Using a function (id_func) to generate ids."""
+    return request.param
+
+
+def test_add_c(tasks_db, c_task):
+    """Use fixture with generated ids."""
+    task_id = tasks.add(c_task)
+    t_from_db = tasks.get(task_id)
+    assert equivalent(t_from_db, c_task)
 ```
 
-## 参数化fixture
+解析：   
+* 1 fixture可做参数化处理
+* 2 关于request，它是fixture的内建函数之一，代表fixture的调用状态，request参数字段param可用作接收该fixture的传参
+* 3 a_task的逻辑仅仅是以request.param作为返回值提供给测试使用，四个task对象会调用4次
+* 4 ids=task_ids：指定输出标志的id是一个列表
+* 5 ids=id_func：指定输出标志的id为一个函数
+* 6 与指定测试函数参数化相比较而言优点在于：测试函数参数化只能运行该测试函数多次，而使用fixture参数化，只要使用了该fixture就可以运行多次测试函数，更加灵活
+* 7 重点是：fixture之间的嵌套使用：test_add_a中（tasks_db-->tasks_db_session-->tmpdir_factory&request;a_task-->request）
+* 8 自定义结果比较函数equivalent
+
+## 参数化项目中的fixture
+```python
+@pytest.fixture(scope='session')
+def tasks_db_session(tmpdir_factory):
+    """Connect to db before tests, disconnect after."""
+    temp_dir = tmpdir_factory.mktemp('temp')
+    tasks.start_tasks_db(str(temp_dir), 'tiny')
+    yield
+    tasks.stop_tasks_db()
+
+
+@pytest.fixture()
+def tasks_db(tasks_db_session):
+    """An empty tasks db."""
+    tasks.delete_all()
+
+# api.py
+def start_tasks_db(db_path, db_type):  # type: (str, str) -> None
+    """Connect API functions to a db."""
+    if not isinstance(db_path, string_types):
+        raise TypeError('db_path must be a string')
+    global _tasksdb
+    if db_type == 'tiny':
+        import tasks.tasksdb_tinydb
+        _tasksdb = tasks.tasksdb_tinydb.start_tasks_db(db_path)
+    elif db_type == 'mongo':
+        import tasks.tasksdb_pymongo
+        _tasksdb = tasks.tasksdb_pymongo.start_tasks_db(db_path)
+    else:
+        raise ValueError("db_type must be a 'tiny' or 'mongo'")
+
+# fixture参数化
+#@pytest.fixture(scope='session', params=['tiny',])
+@pytest.fixture(scope='session', params=['tiny', 'mongo'])
+def tasks_db_session(tmpdir_factory, request):
+    """Connect to db before tests, disconnect after."""
+    temp_dir = tmpdir_factory.mktemp('temp')
+    tasks.start_tasks_db(str(temp_dir), request.param)
+    yield  # this is where the testing happens
+    tasks.stop_tasks_db()
+
+
+@pytest.fixture()
+def tasks_db(tasks_db_session):
+    """An empty tasks db."""
+    tasks.delete_all()
+```
+解析：   
+* 1 引用request特殊的fixture，把db_type的值设置为request.param，可以灵活的解决此问题。
+
 
 
 
