@@ -65,7 +65,10 @@ gitlab上拉取项目
 ```shell script
 git clone 项目http地址
 ```
-
+生成requirements.txt依赖
+```shell script
+pip3 freeze > requirements.txt
+```
 安装依赖：
 ```shell script
 [root@Testing-Platform homedotest]# pip3 install -r requirements.txt
@@ -78,12 +81,29 @@ python setup.py install
 解析：
 安装tar.gz包：cd到解压后路径
 
+linux如何复制文件夹和移动文件夹
+```shell script
+一、文件复制命令cp
+如将/test1目录下的file1复制到/test3目录，并将文件名改为file2,可输入以下命令：
+cp /test1/file1 /test3/file2
+
+二、文件移动命令mv
+如将/test1目录下的file1复制到/test3 目录，并将文件名改为file2,可输入以下命令：
+mv /test1/file1 /test3/file2
+```
+
+
 下载allure压缩文件
 ```shell script
 第一步：下载-解压-配置路径
 Allure包下载地址：
 https://github.com/allure-framework/allure2/releases
 
+下载后，上传到服务器，我放在了/usr/local这个路径下，解压：unzip allure-2.7.0.zip
+接下来配置allure的环境变量：vi /etc/profile
+在最后追加一句：export PATH=$PATH:/usr/local/allure-2.7.0/bin
+保存并退出：wq
+加载一下配置文件：source /etc/profile
 验证：allure --version
 
 第二步：
@@ -134,3 +154,14 @@ ModuleNotFoundError: No module named '_bz2'
 这样就OK了
 ```
 
+
+pytest --version
+如果提示没找到pytest，可以在环境变量中配置pytest所在的包
+```shell script
+vi /etc/profile
+在最后追加一句：
+export PATH=$PATH:/usr/local/python3/lib/python3.6/site-packages/
+：wq保存后退出
+source /etc/profile
+此时在pytest --version可以查看版本号
+```
