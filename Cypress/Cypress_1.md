@@ -30,7 +30,7 @@ openMode：定义运行 cypress open 时的重试次数
 直接看这篇文章：https://www.cnblogs.com/poloyy/p/13042466.html
 
 ## Cypress典型的坑
-* 1 Cypress命令是异步的
+* 1 Cypress命令是异步的   
 解析：Cypress的命令在被调用时并不会被马上执行，Cypress会先把所有命令排队-enquene，
   然后再执行。
 * 2 慎用箭头函数
@@ -47,4 +47,40 @@ Cypress通过以下策略绕过了浏览器的限制：
  首次加载Cypress时，内部Cypress Web应用程序托管在一个随机端口上，类似于http://localhost: 65874/_/
  在测试中，当第一个cy.visit()命令被发出后，Cypress将更改其URL以匹配远程应用程序的来源，从而解决了同源策略的主要障碍。
  坏处是：一次测试中，访问的域名必须处于同一个超域之下（super domain），否则Cypress测试将会报错
+    
+## Cypress的独特之处（掌握）
+* 1 闭包（closure）
+保存一个值或者引用的最好方式是使用闭包。   
+.then()是Cypress对闭包的典型应用    
+.then()返回上一个命令的结果，并将其注入到下一个命令中   
+例子：待补充    
+
+* 2 变量和别名   
+作用：实现元素赋值操作或实现变量共享   
+场景：当你的测试需要一个前置条件才能执行，比如得到数据库中的某个表的值。
+  可以使用.wrap()和.as()命令
+  
+* 3 fixture()
+作用：实现上下文共享   
+场景：测试数据需要的变量直接来自外部文件，可以通过fixture()来实现上下文共享
+.fixture()用来加载位于文件中的一组固定数据
+  
+* 4 自定义方法   
+作用：通过自定义方法，实现上下文共享
+1）在cypress.json文件中，env选项下添加如下配置
+```buildoutcfg
+  "env": {
+    "testVariables": {},
+  }
+```
+2）在测试代码中使用Cypress.env()来设置和获取变量
+```buildoutcfg
+Cypress.env('testVariables', $el.text())
+```
+
+
+  
+
+
+
  
